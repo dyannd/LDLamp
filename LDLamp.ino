@@ -4,23 +4,24 @@
 
 //define the Neopixel pin, this will be different then the pin we soldered the Neopixels to, as they are marked differently
 #define PIN 5
-
+#define INITIALBRIGHTNESS 64
+#define GPIOPIN 12  //pin on the wesmos chip, 12 is D6
 
 //initialize the information for the Neopixels and Adafruit IO
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(12, PIN, NEO_GRB + NEO_KHZ800);
-AdafruitIO_Feed *lamp = io.feed("lamp_aebiu");
+Adafruit_NeoPixel lightStrip = Adafruit_NeoPixel(GPIOPIN, PIN, NEO_GRB + NEO_KHZ800);  //length, pin and pixel type constructor
+AdafruitIO_Feed *lamp = io.feed("lamp_aebiu");                                         //lamp points to the feed name
 
-//how long we want the lamps to stay on when activated (600,000 ms = 10 minutes)
-const long interval = 600000;
+//how long we want the lamps to stay on when activated in millis
+const unsigned long interval = 60000;
 
-//setup the timers and status for the lamp
-unsigned long previousMillis = 0;
+//setup the timers and status for the lamp, in millis
+unsigned long initialTime = 0;
 int tap = 0;
 
-//set one of the lamps to 1, the other to 2
-int lampVal = 1;
+//set one of the lamps to 1, the other to 2 (change when uploading sketch to different chips)
+int lampVal = 2;
 
-//the value that should activate the lamp. Don't mess with this, the code will figure out what this should be in the setup
+//the value that should activate the lamp (is 2 for the first lamp, and 1 for the second)
 int recVal = 0;
 
 
@@ -33,16 +34,16 @@ void setup() {
   //figure out what recieved value should turn on the lamp (lampVal of other lamp)
   if (lampVal == 1) recVal = 2;
   if (lampVal == 2) recVal = 1;
-  
+
   //Activate the Neopixels
-  strip.begin();
-  strip.setBrightness(255);
-  strip.show(); // Initialize all pixels to 'off'
+  lightStrip.begin();
+  lightStrip.setBrightness(INITIALBRIGHTNESS);
+  lightStrip.show();  // Initialize all pixels
 
   //setup the touch sensor as a interrupt and input
-  pinMode(12, INPUT);
-  attachInterrupt(digitalPinToInterrupt(12), touch, CHANGE);
-  
+  pinMode(GPIOPIN, INPUT);
+  attachInterrupt(digitalPinToInterrupt(GPIOPIN), touch, CHANGE);  //executes the touch function when event changes on GPIOpin
+
   //start connecting to Adafruit IO
   Serial.print("Connecting to Adafruit IO");
   io.connect();
@@ -50,8 +51,8 @@ void setup() {
   //get the status of the value in Adafruit IO
   lamp->onMessage(handleMessage);
 
-  //connect to Adafruit IO and play the "spin" Neopixel animation to show it's connecting until and connection is established
-  while(io.status() < AIO_CONNECTED) {
+  //connect to Adafruit IO and play the "spin" animation to show it's connecting until and connection is established
+  while (io.status() < AIO_CONNECTED) {
     Serial.print(".");
     spin();
     delay(500);
@@ -64,9 +65,9 @@ void setup() {
 
   //get the status of our value in Adafruit IO
   lamp->get();
-  
-  
-  previousMillis = millis();
+
+  //init the initial time
+  initialTime = millis();
 }
 
 void loop() {
@@ -75,63 +76,52 @@ void loop() {
   io.run();
 
   //set the starting timer value
-  unsigned long currentMillis = millis();
+  unsigned long currentTime = millis();
 
   //tap = 1 means that we have established that the other lamp was tapped
   if (tap == 1) {
 
-    //check to see if the timer if over 10 minutes. If it is, turn off the Neopixels and reset the tap status
-    if (currentMillis - previousMillis >= interval) {
+    //check to see if the timer if over our predefined interval. If it is, turn off the Neopixels and reset the tap status
+    if (currentTime - initialTime >= interval) {
       off();
       tap = 0;
-    
     } else {
-
-      //if the timer isn't over 10 minutes, continue playing the rainbow animation at a slow speed
+      //if the timer isn't over the predefined interval, continue playing the rainbow animation at a slow speed
       rainbow(200);
-      
     }
-    
   }
-  
 }
 
 
 //the interrupt program that runs when the touch sensor is activated
-ICACHE_RAM_ATTR void touch() {
+IRAM_ATTR void touch() {
 
   //while the touch sensor is activated, save the lampVal (either 1 or 2) to the Adafruit IO feed and turn the Neopixels to purple
-  while (digitalRead(12) == 1) {
+  while (digitalRead(GPIOPIN) == 1) {
 
     lamp->save(lampVal);
-      Serial.print("This is lamp number ");
-      Serial.print(lampVal);
-      Serial.println();
-      for(int i=0; i<strip.numPixels(); i++) {
-        
-      strip.setPixelColor(i, 102, 0, 204);
-      
+    Serial.print("This is lamp number ");
+    Serial.print(lampVal);
+    Serial.println();
+    for (int i = 0; i < lightStrip.numPixels(); i++) {
+      lightStrip.setPixelColor(i, 102, 0, 204);
     }
-    
-    strip.show();
 
-   //once the touch sensor isn't activated, send a 0 back to the Adafruit IO feed. 
-  } if (digitalRead(12) == 0) {
-    
-      lamp->save(0);
-      
-      for(int i=0; i<strip.numPixels(); i++) {
-        
-      strip.setPixelColor(i, 0, 0, 0);
-      
-    }
-    
-    strip.show();
-    
+    lightStrip.show();
+
+    //once the touch sensor isn't activated, send a 0 back to the Adafruit IO feed.
   }
-  
+  if (digitalRead(GPIOPIN) == 0) {
 
-  
+    lamp->save(0);
+
+    for (int i = 0; i < lightStrip.numPixels(); i++) {
+
+      lightStrip.setPixelColor(i, 0, 0, 0);
+    }
+
+    lightStrip.show();
+  }
 }
 
 
@@ -143,28 +133,27 @@ void handleMessage(AdafruitIO_Data *data) {
   //convert the recieved data to an INT
   int reading = data->toInt();
 
-  //if the recieved value is equal to the recVal, and the lamp status is currently off, change the status to on and recent the timer
-  if(reading == recVal && tap == 0) {
-    
+  //if the received value is equal to the recVal, and the lamp status is currently off, change the status to on and renew the timer
+  if (reading == recVal && tap == 0) {
+
     Serial.println("TAP");
-    previousMillis = millis();
+    initialTime = millis();
+    Serial.println(initialTime);
     tap = 1;
 
-  //if we recieve a value but the lamp is already on nothing happens
+    //if we recieve a value but the lamp is already on, nothing happens
   } else {
     Serial.println("LOW");
   }
-
 }
 
-//simple code to turn all of the Neopixels off
+//turn all of the Neopixels off
 void off() {
-  
-for(int i=0; i<strip.numPixels(); i++) {
-      strip.setPixelColor(i, 0, 0, 0);
-    }
-    strip.show();
-  
+
+  for (int i = 0; i < lightStrip.numPixels(); i++) {
+    lightStrip.setPixelColor(i, 0, 0, 0);
+  }
+  lightStrip.show();
 }
 
 
@@ -172,76 +161,81 @@ for(int i=0; i<strip.numPixels(); i++) {
 void rainbow(uint8_t wait) {
   uint16_t i, j;
 
-  for(j=0; j<256; j++) {
-    for(i=0; i<strip.numPixels(); i++) {
-      strip.setPixelColor(i, Wheel((i+j) & 255));
+  for (j = 0; j < 256; j++) {
+    for (i = 0; i < lightStrip.numPixels(); i++) {
+      lightStrip.setPixelColor(i, Wheel((i + j) & 255));
     }
-    strip.show();
+    lightStrip.show();
     delay(wait);
   }
 }
 
 
-//complicated geometry or something to figure out the color values (I don't know how this stuff works, thank goodness for adafruit)
+//complicated geometry or something to figure out the color values
 uint32_t Wheel(byte WheelPos) {
   WheelPos = 255 - WheelPos;
-  if(WheelPos < 85) {
-    return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3);
+  if (WheelPos < 85) {
+    return lightStrip.Color(255 - WheelPos * 3, 0, WheelPos * 3);
   }
-  if(WheelPos < 170) {
+  if (WheelPos < 170) {
     WheelPos -= 85;
-    return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3);
+    return lightStrip.Color(0, WheelPos * 3, 255 - WheelPos * 3);
   }
   WheelPos -= 170;
-  return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+  return lightStrip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
 }
 
 
 //code to flash the Neopixels when a stable connection to Adafruit IO is made
 void flash() {
 
-  for(int i=0; i<strip.numPixels(); i++) {
-      strip.setPixelColor(i, 255, 255, 255);
-    }
-  strip.show();
-  
+  for (int i = 0; i < lightStrip.numPixels(); i++) {
+    lightStrip.setBrightness(20);
+    lightStrip.setPixelColor(i, 255, 255, 255);
+  }
+
+  lightStrip.show();
+
   delay(200);
 
-  for(int i=0; i<strip.numPixels(); i++) {
-      strip.setPixelColor(i, 0, 0, 0);
-    }
-  strip.show();
-  
+  for (int i = 0; i < lightStrip.numPixels(); i++) {
+    lightStrip.setPixelColor(i, 0, 0, 0);
+  }
+  lightStrip.show();
+
   delay(200);
 
-  for(int i=0; i<strip.numPixels(); i++) {
-      strip.setPixelColor(i, 255, 255, 255);
-    }
-  strip.show();
-  
+  for (int i = 0; i < lightStrip.numPixels(); i++) {
+    lightStrip.setBrightness(20);
+    lightStrip.setPixelColor(i, 255, 255, 255);
+  }
+  lightStrip.show();
+
   delay(200);
 
-  for(int i=0; i<strip.numPixels(); i++) {
-      strip.setPixelColor(i, 0, 0, 0);
-    }
-  strip.show();
-  
+  for (int i = 0; i < lightStrip.numPixels(); i++) {
+    lightStrip.setPixelColor(i, 0, 0, 0);
+  }
+  lightStrip.show();
+
   delay(200);
 }
 
 
-//the code to create the blue spinning animation when connecting to Adafruit IO
+
+//Spinning animation when connecting to Adafruit IO
 void spin() {
 
-  for(int i=0; i<strip.numPixels(); i++) {
-      strip.setPixelColor(i, 0, 0, 255);
-      strip.show();
-      delay(20);
-    }
-    for(int i=0; i<strip.numPixels(); i++) {
-      strip.setPixelColor(i, 0, 0, 0);
-      strip.show();
-      delay(20);
-    }
-  
+  for (int i = 0; i < lightStrip.numPixels(); i++) {
+    lightStrip.setBrightness(64);
+    lightStrip.setPixelColor(i, 255, 255, 255);
+    lightStrip.show();
+    delay(100);
+  }
+  for (int i = 0; i < lightStrip.numPixels(); i++) {
+    lightStrip.setBrightness(64);
+    lightStrip.setPixelColor(i, 0, 0, 0);
+    lightStrip.show();
+    delay(100);
+  }
 }
