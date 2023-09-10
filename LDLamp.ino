@@ -1,8 +1,25 @@
-//import the libraries
+// //import the libraries
 #include <Adafruit_NeoPixel.h>
 #include "config.h"
 #include "color.h"
 #include <NeoPixelBrightnessBus.h>
+
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128  // OLED display width, in pixels
+#define SCREEN_HEIGHT 32  // OLED display height, in pixels
+
+// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+// The pins for I2C are defined by the Wire-library.
+// On an arduino UNO:       A4(SDA), A5(SCL)
+// On an arduino MEGA 2560: 20(SDA), 21(SCL)
+// On an arduino LEONARDO:   2(SDA),  3(SCL), ...
+#define OLED_RESET -1        // Reset pin # (or -1 if sharing Arduino reset pin)
+#define SCREEN_ADDRESS 0x3C  ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 //define the Neopixel pin, this will be different then the pin we soldered the Neopixels to, as they are marked differently
 #define PIN 3  //pin on the wesmos chip, RX pin
@@ -10,8 +27,8 @@
 #define GPIOPIN 12  //pin on the wesmos chip, 12 is D6
 #define LEDS 12
 
-//set one of the lamps to 1, the other to 2 (change when uploading sketch to different chips)
-int lampVal = 2;
+//set one of the lamps to 1, the other to 2 (change when uploading sketch to different chips) (breadboard is 2)
+int lampVal = 1;
 
 //initialize the information for the Neopixels and Adafruit IO
 NeoPixelBrightnessBus< NeoGrbFeature, NeoEsp8266Dma800KbpsMethod > lightStrip(LEDS, PIN);
@@ -52,10 +69,19 @@ unsigned long currentMillis;
 unsigned long previousMillis = 0;
 const unsigned long conection_time_out = 300000;  // 5 minutes
 
+
+
 void setup() {
 
   //Start the serial monitor for debugging and status
   Serial.begin(9600);
+
+  // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
+  if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+    Serial.println(F("SSD1306 allocation failed"));
+    for (;;)
+      ;  // Don't proceed, loop forever
+  }
 
   //  Set ID values
   if (lampVal == 1) {
@@ -81,12 +107,26 @@ void setup() {
   //get the status of the value in Adafruit IO when a message is received
   lamp->onMessage(handleMessage);
 
+  // the library initializes this with an Adafruit splash screen.
+  display.display();
+  delay(500);
+  display.clearDisplay();
+  delay(100);
+  display.setTextSize(1);  // Draw 2X-scale text
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 1);
+  display.println(F("Doi xiu dang ket noi"));
+  display.display();
+
   //connect to Adafruit IO and play the "spin" animation to show it's connecting until and connection is established
   while (io.status() < AIO_CONNECTED) {
     Serial.print(".");
     spin(6);
     delay(500);
   }
+
+  // Clear the buffer
+  display.clearDisplay();
   off();
 
   //when a connection to Adafruit IO is made write the status in the Serial monitor and flash the Neopixels
@@ -129,6 +169,12 @@ void loop() {
         if (pressDuration > long_press_time) {
           state = 1;
         }
+      } else {
+        display.clearDisplay();
+        display.setCursor(0, 7);
+        display.println("Giu 2 giay de goi a biu nho");
+        display.display();  // Show initial text
+        delay(100);
       }
       lastState = currentState;
       break;
@@ -142,6 +188,12 @@ void loop() {
       break;
 
     case 2:  // Color selector
+      display.clearDisplay();
+      display.setCursor(0, 7);
+      display.println("Tap de doi mau");
+      display.println("Mau ok rui thi tha ra nho..");
+      display.display();  // Show initial text
+      delay(100);
       if (digitalRead(GPIOPIN) == HIGH) {
         selected_color++;
         if (selected_color > 9)
@@ -167,6 +219,12 @@ void loop() {
       sprintf(msg, "L%d: color send", lampVal);
       lamp->save(msg);
       lamp->save(selected_color + sendVal);
+      display.clearDisplay();
+      display.setCursor(0, 7);
+      display.println("Dang goi a biu..");
+      display.println("Doi xiu i..");
+      display.display();  // Show initial text
+      delay(100);
       Serial.print(selected_color + sendVal);
       state = 4;
       flash(selected_color);
@@ -200,6 +258,12 @@ void loop() {
     case 6:  // Answer received
       Serial.println("Answer received");
       light_full_intensity(selected_color);
+      display.clearDisplay();
+      display.setCursor(0, 7);
+      display.println("A biu tra loi neee..");
+      display.println("<3 <3 <3..");
+      display.display();  // Show initial text
+      delay(100);
       RefMillis = millis();
       sprintf(msg, "L%d: connected", lampVal);
       lamp->save(msg);
@@ -227,6 +291,12 @@ void loop() {
       break;
 
     case 9:  // Msg received
+      display.clearDisplay();
+      display.setCursor(0, 7);
+      display.println("Em biu goi nee..");
+      display.println("Tap de tra loi..");
+      display.display();  // Show initial text
+      delay(100);
       sprintf(msg, "L%d: msg received", lampVal);
       lamp->save(msg);
       RefMillis = millis();
@@ -253,6 +323,11 @@ void loop() {
 
     case 11:  // Send answer
       light_full_intensity(selected_color);
+      display.clearDisplay();
+      display.setCursor(0, 7);
+      display.println("Ket noi thanh cong :*");
+      display.display();  // Show initial text
+      delay(100);
       RefMillis = millis();
       sprintf(msg, "L%d: answer sent", lampVal);
       lamp->save(msg);
@@ -266,14 +341,41 @@ void loop() {
   }
 }
 
+void testscrolltext(void) {
+  display.clearDisplay();
+
+  display.setTextSize(1);  // Draw 2X-scale text
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(10, 0);
+  display.println(F("nho em biu <3"));
+  display.display();  // Show initial text
+  delay(100);
+
+  // Scroll in various directions, pausing in-between:
+  display.startscrollright(0x00, 0x0F);
+  delay(2000);
+  display.stopscroll();
+  delay(1000);
+  display.startscrollleft(0x00, 0x0F);
+  delay(2000);
+  display.stopscroll();
+  delay(1000);
+  display.startscrolldiagright(0x00, 0x07);
+  delay(2000);
+  display.startscrolldiagleft(0x00, 0x07);
+  delay(2000);
+  display.stopscroll();
+  delay(1000);
+}
+
 //code that tells the ESP8266 what to do when it recieves new data from the Adafruit IO feed
 void handleMessage(AdafruitIO_Data *data) {
   //convert the recieved data to an INT
   int reading = data->toInt();
-  if (reading == 66) {
+  if (reading == 66) {  //reset lamp 1 with code 401
     sprintf(msg, "L%d: rebooting", lampVal);
     lamp->save(msg);
-    lamp->save(0);
+    delay(2000);
     ESP.restart();
   } else if (reading == 100) {
     sprintf(msg, "L%d: ping", lampVal);
