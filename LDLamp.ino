@@ -11,7 +11,11 @@
 
 #define SCREEN_WIDTH 128  // OLED display width, in pixels
 #define SCREEN_HEIGHT 32  // OLED display height, in pixels
-
+//miss: pink
+//vui: yellow
+//sad: xanh duong
+//angry: purp
+//lam hoa: white
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
 // The pins for I2C are defined by the Wire-library.
 // On an arduino UNO:       A4(SDA), A5(SCL)
@@ -49,6 +53,8 @@ int tap = 0;
 //the value that should activate the lamp (is 2 for the first lamp, and 1 for the second)
 int recVal{ 0 };
 int sendVal{ 0 };
+String mainChar;
+String currChar;
 
 // Long press detection
 const int long_press_time = 2000;
@@ -87,9 +93,13 @@ void setup() {
   if (lampVal == 1) {
     recVal = 20;
     sendVal = 10;
+    mainChar = String("em biu");
+    currChar = String("anh biu");
   } else if (lampVal == 2) {
     recVal = 10;
     sendVal = 20;
+    mainChar = String("anh biu");
+    currChar = String("em biu");
   }
 
 
@@ -112,7 +122,7 @@ void setup() {
   delay(500);
   display.clearDisplay();
   delay(100);
-  display.setTextSize(1);  // Draw 2X-scale text
+  display.setTextSize(0.8);  // Draw 1X-scale text
   display.setTextColor(SSD1306_WHITE);
   display.setCursor(0, 1);
   display.println(F("Doi xiu dang ket noi"));
@@ -172,7 +182,7 @@ void loop() {
       } else {
         display.clearDisplay();
         display.setCursor(0, 7);
-        display.println("Giu 2 giay de goi a biu nho");
+        display.println("Giu 2 giay de goi " + mainChar + " nho");
         display.display();  // Show initial text
         delay(100);
       }
@@ -182,33 +192,69 @@ void loop() {
     case 1:  // Wait for button release
       selected_color = 0;
       light_half_intensity(selected_color);
+      display.clearDisplay();
+      display.setCursor(0, 7);
+      display.println("Nho " + mainChar + " quaaa");
+      display.display();
+      delay(100);
       state = 2;
       RefMillis = millis();
       while (digitalRead(GPIOPIN) == HIGH) {}
       break;
 
     case 2:  // Color selector
-      display.clearDisplay();
-      display.setCursor(0, 7);
-      display.println("Tap de doi mau");
-      display.println("Mau ok rui thi tha ra nho..");
-      display.display();  // Show initial text
-      delay(100);
+      if (selected_color == 0) {
+        display.clearDisplay();
+        display.setCursor(0, 7);
+        display.println("Nho " + mainChar + " quaaa");
+        display.display();
+        delay(100);
+      } else if (selected_color == 1) {
+        display.clearDisplay();
+        display.setCursor(0, 7);
+        display.println("Bun qua " + mainChar + " oii");
+        display.display();
+        delay(100);
+      } else if (selected_color == 2) {
+        display.clearDisplay();
+        display.setCursor(0, 7);
+        display.println("Doi " + mainChar + " ruii >.<");
+        display.display();
+        delay(100);
+      } else if (selected_color == 3) {
+        display.clearDisplay();
+        display.setCursor(0, 7);
+        display.println("Dang vui " + mainChar + " oii :))))");
+        display.display();
+        delay(100);
+      } else if (selected_color == 4) {
+        display.clearDisplay();
+        display.setCursor(0, 7);
+        display.println("Thui lam hoa di moooo");
+        display.display();
+        delay(100);
+      } else if (selected_color == 5) {
+        display.clearDisplay();
+        display.setCursor(0, 7);
+        display.println("Doi y het muon goi rui");
+        display.display();  // Show initial text
+        delay(100);
+      }
       if (digitalRead(GPIOPIN) == HIGH) {
         selected_color++;
-        if (selected_color > 9)
+        // reset state if scroll passed
+        if (selected_color > 5)
           selected_color = 0;
-        while (digitalRead(GPIOPIN) == HIGH) {
-          delay(50);
-        }
+        while (digitalRead(GPIOPIN) == HIGH) {}
         light_half_intensity(selected_color);
         // Reset timer each time it is touched
         RefMillis = millis();
       }
+
       // If a color is selected more than a time, it is interpreted as the one selected
       ActMillis = millis();
       if (ActMillis - RefMillis > send_selected_color_time) {
-        if (selected_color == 9)  //  Cancel msg
+        if (selected_color == 5)  //  Cancel msg
           state = 8;
         else
           state = 3;
@@ -221,7 +267,7 @@ void loop() {
       lamp->save(selected_color + sendVal);
       display.clearDisplay();
       display.setCursor(0, 7);
-      display.println("Dang goi a biu..");
+      display.println("Dang goi " + mainChar);
       display.println("Doi xiu i..");
       display.display();  // Show initial text
       delay(100);
@@ -260,7 +306,7 @@ void loop() {
       light_full_intensity(selected_color);
       display.clearDisplay();
       display.setCursor(0, 7);
-      display.println("A biu tra loi neee..");
+      display.println(mainChar + " tra loi neee..");
       display.println("<3 <3 <3..");
       display.display();  // Show initial text
       delay(100);
@@ -291,12 +337,37 @@ void loop() {
       break;
 
     case 9:  // Msg received
-      display.clearDisplay();
-      display.setCursor(0, 7);
-      display.println("Em biu goi nee..");
-      display.println("Tap de tra loi..");
-      display.display();  // Show initial text
-      delay(100);
+      if (selected_color == 0) {
+        display.clearDisplay();
+        display.setCursor(0, 7);
+        display.println(mainChar + " nho " + currChar + " quaaa");
+        display.display();
+        delay(100);
+      } else if (selected_color == 1) {
+        display.clearDisplay();
+        display.setCursor(0, 7);
+        display.println(mainChar + " bun qua baby oii");
+        display.display();
+        delay(100);
+      } else if (selected_color == 2) {
+        display.clearDisplay();
+        display.setCursor(0, 7);
+        display.println(mainChar + " doi ruii >.<");
+        display.display();
+        delay(100);
+      } else if (selected_color == 3) {
+        display.clearDisplay();
+        display.setCursor(0, 7);
+        display.println(mainChar + " vui quo hehehe :))))");
+        display.display();
+        delay(100);
+      } else if (selected_color == 4) {
+        display.clearDisplay();
+        display.setCursor(0, 7);
+        display.println("Thui lam hoa di moooo");
+        display.display();
+        delay(100);
+      }
       sprintf(msg, "L%d: msg received", lampVal);
       lamp->save(msg);
       RefMillis = millis();
@@ -341,6 +412,14 @@ void loop() {
   }
 }
 
+// void displayLCDText(Strings[] strArr) {
+//   display.clearDisplay();
+//   display.setCursor(0, 7);
+//   for (int i = 0; i < sizeof strArr; i++){
+//     display.println(strArr[i]);
+//   }
+//   delay(50);
+// }
 void testscrolltext(void) {
   display.clearDisplay();
 
