@@ -34,7 +34,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 
 //set one of the lamps to 1, the other to 2 (change when uploading sketch to different chips) (breadboard is 2)
-int lampVal = 1;
+int lampVal = 2;
 
 //initialize the information for the Neopixels and Adafruit IO
 NeoPixelBrightnessBus< NeoGrbFeature, NeoEsp8266Dma800KbpsMethod > lightStrip(LEDS, PIN);
@@ -190,6 +190,7 @@ void loop() {
         }
       } else {
         display.clearDisplay();
+        display.stopscroll();
         display.setCursor(0, 0);
         display.println("Giu 2 giay de goi " + mainChar + " nho");
         display.display();  // Show initial text
@@ -276,8 +277,8 @@ void loop() {
       lamp->save(selected_color + sendVal);
       display.clearDisplay();
       display.setCursor(0, 0);
-      display.println("Dang goi " + mainChar);
       display.println("Doi xiu i..");
+      display.startscrollleft(128, 0);
       display.display();  // Show initial text
       delay(100);
       Serial.print(selected_color + sendVal);
@@ -315,8 +316,8 @@ void loop() {
       light_full_intensity(selected_color);
       display.clearDisplay();
       display.setCursor(0, 0);
-      display.println(mainChar + " tra loi neee..");
-      display.println("<3 <3 <3..");
+      display.println(mainChar + " tra loi neee <3 ... ");
+      display.startscrollleft(128, 0);
       display.display();  // Show initial text
       delay(100);
       RefMillis = millis();
@@ -405,7 +406,7 @@ void loop() {
       light_full_intensity(selected_color);
       display.clearDisplay();
       display.setCursor(0, 0);
-      display.println("Ket noi thanh cong :*");
+      display.println("Vua tra loi "+mainChar+" ruii..");
       display.display();  // Show initial text
       delay(100);
       RefMillis = millis();
@@ -419,41 +420,6 @@ void loop() {
       state = 0;
       break;
   }
-}
-
-// void displayLCDText(Strings[] strArr) {
-//   display.clearDisplay();
-//   display.setCursor(0, 7);
-//   for (int i = 0; i < sizeof strArr; i++){
-//     display.println(strArr[i]);
-//   }
-//   delay(50);
-// }
-void testscrolltext(void) {
-  display.clearDisplay();
-
-  display.setTextSize(1);  // Draw 2X-scale text
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(10, 0);
-  display.println(F("nho em biu <3"));
-  display.display();  // Show initial text
-  delay(100);
-
-  // Scroll in various directions, pausing in-between:
-  display.startscrollright(0x00, 0x0F);
-  delay(2000);
-  display.stopscroll();
-  delay(1000);
-  display.startscrollleft(0x00, 0x0F);
-  delay(2000);
-  display.stopscroll();
-  delay(1000);
-  display.startscrolldiagright(0x00, 0x07);
-  delay(2000);
-  display.startscrolldiagleft(0x00, 0x07);
-  delay(2000);
-  display.stopscroll();
-  delay(1000);
 }
 
 //code that tells the ESP8266 what to do when it recieves new data from the Adafruit IO feed
@@ -581,6 +547,11 @@ void spin(int ind) {
 
 // Waiting connection led setup
 void wait_connection() {
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.println("Connect WiFi cho tui nho");
+  display.display(); 
+
   lightStrip.SetBrightness(max_intensity/2);
   for (int i = 0; i < 3; i++) {
     lightStrip.SetPixelColor(i, yellow);
@@ -621,9 +592,6 @@ void wificonfig() {
   bool res;
   wifiManager.setAPCallback(configModeCallback);
   res = wifiManager.autoConnect(wifiName, wifiPass);  // password protected ap
-  display.setCursor(0, 0);
-  display.println("Ket noi");
-  display.display();
   if (!res) {
     spin(0);
     delay(50);
