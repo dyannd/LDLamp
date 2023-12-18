@@ -3,6 +3,7 @@
 #include "config.h"
 #include "color.h"
 #include <NeoPixelBrightnessBus.h>
+#include <WiFiManager.h>
 
 #include <SPI.h>
 #include <Wire.h>
@@ -31,6 +32,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define GPIOPIN 12  //pin on the wesmos chip, 12 is D6
 #define LEDS 12
 
+
 //set one of the lamps to 1, the other to 2 (change when uploading sketch to different chips) (breadboard is 2)
 int lampVal = 1;
 
@@ -55,6 +57,8 @@ int recVal{ 0 };
 int sendVal{ 0 };
 String mainChar;
 String currChar;
+char* wifiName;
+char* wifiPass = "18072022";
 
 // Long press detection
 const int long_press_time = 2000;
@@ -80,7 +84,7 @@ const unsigned long conection_time_out = 300000;  // 5 minutes
 void setup() {
 
   //Start the serial monitor for debugging and status
-  Serial.begin(9600);
+  Serial.begin(115200);
 
   // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
   if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
@@ -89,33 +93,9 @@ void setup() {
       ;  // Don't proceed, loop forever
   }
 
-  //  Set ID values
-  if (lampVal == 1) {
-    recVal = 20;
-    sendVal = 10;
-    mainChar = String("em biu");
-    currChar = String("anh biu");
-  } else if (lampVal == 2) {
-    recVal = 10;
-    sendVal = 20;
-    mainChar = String("anh biu");
-    currChar = String("em biu");
-  }
-
-
-  //Activate the Neopixels
+  // Activate neopixels
   lightStrip.Begin();
-  lightStrip.Show();  // Initialize all pixels
-
-  //setup the touch sensor as an input
-  pinMode(GPIOPIN, INPUT);
-
-  //start connecting to Adafruit IO
-  Serial.print("Connecting to Adafruit IO");
-  io.connect();
-
-  //get the status of the value in Adafruit IO when a message is received
-  lamp->onMessage(handleMessage);
+  lightStrip.Show(); // Initialize all pixels to 'off'
 
   // the library initializes this with an Adafruit splash screen.
   display.display();
@@ -125,8 +105,37 @@ void setup() {
   display.setTextSize(0.8);  // Draw 1X-scale text
   display.setTextColor(SSD1306_WHITE);
   display.setCursor(0, 1);
-  display.println(F("Doi xiu dang ket noi"));
+  display.println("Doi xiu dang ket noi");
   display.display();
+
+  //setup the touch sensor as an input
+  pinMode(GPIOPIN, INPUT);
+
+  //  Set ID values
+  if (lampVal == 1) {
+    recVal = 20;
+    sendVal = 10;
+    mainChar = String("em biu");
+    currChar = String("anh biu");
+    wifiName = "Den tinh iu cua anh piu"; //set current wifiname
+  } else if (lampVal == 2) {
+    recVal = 10;
+    sendVal = 20;
+    mainChar = String("anh biu");
+    currChar = String("em biu");
+    wifiName = "Den tinh iu cua em piu"; //set current wifiname
+  }
+
+  wificonfig(); //initializes wifi
+
+  //start connecting to Adafruit IO
+  Serial.printf("\nConnecting to Adafruit IO with User: %s Key: %s.\n", IO_USERNAME, IO_KEY);
+  AdafruitIO_WiFi io(IO_USERNAME, IO_KEY, "", "");
+  io.connect();
+
+  //get the status of the value in Adafruit IO when a message is received
+  lamp->onMessage(handleMessage);
+
 
   //connect to Adafruit IO and play the "spin" animation to show it's connecting until and connection is established
   while (io.status() < AIO_CONNECTED) {
@@ -181,7 +190,7 @@ void loop() {
         }
       } else {
         display.clearDisplay();
-        display.setCursor(0, 7);
+        display.setCursor(0, 0);
         display.println("Giu 2 giay de goi " + mainChar + " nho");
         display.display();  // Show initial text
         delay(100);
@@ -193,7 +202,7 @@ void loop() {
       selected_color = 0;
       light_half_intensity(selected_color);
       display.clearDisplay();
-      display.setCursor(0, 7);
+      display.setCursor(0, 0);
       display.println("Nho " + mainChar + " quaaa");
       display.display();
       delay(100);
@@ -205,37 +214,37 @@ void loop() {
     case 2:  // Color selector
       if (selected_color == 0) {
         display.clearDisplay();
-        display.setCursor(0, 7);
+        display.setCursor(0, 0);
         display.println("Nho " + mainChar + " quaaa");
         display.display();
         delay(100);
       } else if (selected_color == 1) {
         display.clearDisplay();
-        display.setCursor(0, 7);
+        display.setCursor(0, 0);
         display.println("Bun qua " + mainChar + " oii");
         display.display();
         delay(100);
       } else if (selected_color == 2) {
         display.clearDisplay();
-        display.setCursor(0, 7);
+        display.setCursor(0, 0);
         display.println("Doi " + mainChar + " ruii >.<");
         display.display();
         delay(100);
       } else if (selected_color == 3) {
         display.clearDisplay();
-        display.setCursor(0, 7);
+        display.setCursor(0, 0);
         display.println("Dang vui " + mainChar + " oii :))))");
         display.display();
         delay(100);
       } else if (selected_color == 4) {
         display.clearDisplay();
-        display.setCursor(0, 7);
+        display.setCursor(0, 0);
         display.println("Thui lam hoa di moooo");
         display.display();
         delay(100);
       } else if (selected_color == 5) {
         display.clearDisplay();
-        display.setCursor(0, 7);
+        display.setCursor(0, 0);
         display.println("Doi y het muon goi rui");
         display.display();  // Show initial text
         delay(100);
@@ -266,7 +275,7 @@ void loop() {
       lamp->save(msg);
       lamp->save(selected_color + sendVal);
       display.clearDisplay();
-      display.setCursor(0, 7);
+      display.setCursor(0, 0);
       display.println("Dang goi " + mainChar);
       display.println("Doi xiu i..");
       display.display();  // Show initial text
@@ -305,7 +314,7 @@ void loop() {
       Serial.println("Answer received");
       light_full_intensity(selected_color);
       display.clearDisplay();
-      display.setCursor(0, 7);
+      display.setCursor(0, 0);
       display.println(mainChar + " tra loi neee..");
       display.println("<3 <3 <3..");
       display.display();  // Show initial text
@@ -339,31 +348,31 @@ void loop() {
     case 9:  // Msg received
       if (selected_color == 0) {
         display.clearDisplay();
-        display.setCursor(0, 7);
+        display.setCursor(0, 0);
         display.println(mainChar + " nho " + currChar + " quaaa");
         display.display();
         delay(100);
       } else if (selected_color == 1) {
         display.clearDisplay();
-        display.setCursor(0, 7);
+        display.setCursor(0, 0);
         display.println(mainChar + " bun qua baby oii");
         display.display();
         delay(100);
       } else if (selected_color == 2) {
         display.clearDisplay();
-        display.setCursor(0, 7);
+        display.setCursor(0, 0);
         display.println(mainChar + " doi ruii >.<");
         display.display();
         delay(100);
       } else if (selected_color == 3) {
         display.clearDisplay();
-        display.setCursor(0, 7);
+        display.setCursor(0, 0);
         display.println(mainChar + " vui quo hehehe :))))");
         display.display();
         delay(100);
       } else if (selected_color == 4) {
         display.clearDisplay();
-        display.setCursor(0, 7);
+        display.setCursor(0, 0);
         display.println("Thui lam hoa di moooo");
         display.display();
         delay(100);
@@ -395,7 +404,7 @@ void loop() {
     case 11:  // Send answer
       light_full_intensity(selected_color);
       display.clearDisplay();
-      display.setCursor(0, 7);
+      display.setCursor(0, 0);
       display.println("Ket noi thanh cong :*");
       display.display();  // Show initial text
       delay(100);
@@ -567,4 +576,65 @@ void spin(int ind) {
     lightStrip.Show();
     delay(30);
   }
+}
+
+
+// Waiting connection led setup
+void wait_connection() {
+  lightStrip.SetBrightness(max_intensity/2);
+  for (int i = 0; i < 3; i++) {
+    lightStrip.SetPixelColor(i, yellow);
+  }
+  lightStrip.Show();
+  delay(50);
+  for (int i = 3; i < 6; i++) {
+    lightStrip.SetPixelColor(i, pink);
+  }
+  lightStrip.Show();
+  delay(50);
+  for (int i = 6; i < 9; i++) {
+    lightStrip.SetPixelColor(i, cyan);
+  }
+  lightStrip.Show();
+  delay(50);
+  for (int i = 9; i < 12; i++) {
+    lightStrip.SetPixelColor(i, white);
+  }
+  lightStrip.Show();
+  delay(50);
+}
+
+void configModeCallback(WiFiManager *myWiFiManager) {
+  Serial.println("Entered config mode");
+  wait_connection();
+}
+
+void wificonfig() {
+  WiFi.mode(WIFI_STA);
+  WiFiManager wifiManager;
+
+  std::vector<const char *> menu = { "wifi", "info" };
+  wifiManager.setMenu(menu);
+  // set dark theme
+  wifiManager.setClass("invert");
+
+  bool res;
+  wifiManager.setAPCallback(configModeCallback);
+  res = wifiManager.autoConnect(wifiName, wifiPass);  // password protected ap
+  display.setCursor(0, 0);
+  display.println("Ket noi");
+  display.display();
+  if (!res) {
+    spin(0);
+    delay(50);
+    off();
+  } else {
+    //if you get here you have connected to the WiFi
+    spin(3);
+    delay(50);
+    off();
+  }
+  Serial.println("Ready");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
 }
