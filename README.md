@@ -4,7 +4,7 @@
   Create a pair of lamp to establish a meaningful way to communicate between friends or couples. With just some taps, the lamp lightens up with different colors representing moods of the sender. Once the receiver replies, both lamps lighten up brightly, indicating a strong connection is made.
 
 ## Demo:
-
+![](lamps.gif) 
 
 ## Part list:
 - 1 x 12-LEDs ring
