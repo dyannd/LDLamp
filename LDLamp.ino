@@ -68,7 +68,7 @@ unsigned long pressedTime = 0;
 unsigned long releasedTime = 0;
 
 // Time vars
-unsigned long RefMillis;
+unsigned long refTime;
 unsigned long ActMillis;
 const int send_selected_color_time = 4000;
 const int answer_time_out = 900000;
@@ -175,7 +175,7 @@ void loop() {
   //set the starting timer value
   unsigned long currentTime = millis();
 
-  // State machine
+  // Finite State machine
   switch (state) {
       // Wait
     case 0:
@@ -208,7 +208,7 @@ void loop() {
       display.display();
       delay(100);
       state = 2;
-      RefMillis = millis();
+      refTime = millis();
       while (digitalRead(GPIOPIN) == HIGH) {}
       break;
 
@@ -258,12 +258,12 @@ void loop() {
         while (digitalRead(GPIOPIN) == HIGH) {}
         light_half_intensity(selected_color);
         // Reset timer each time it is touched
-        RefMillis = millis();
+        refTime = millis();
       }
 
-      // If a color is selected more than a time, it is interpreted as the one selected
+      // Wait for send_selected_color_time before proceeding
       ActMillis = millis();
-      if (ActMillis - RefMillis > send_selected_color_time) {
+      if (ActMillis - refTime > send_selected_color_time) {
         if (selected_color == 5)  //  Cancel msg
           state = 8;
         else
@@ -291,7 +291,7 @@ void loop() {
       break;
 
     case 4:  // Set timer
-      RefMillis = millis();
+      refTime = millis();
       state = 5;
       i_breath = 0;
       break;
@@ -300,7 +300,7 @@ void loop() {
       for (i_breath = 0; i_breath <= 314; i_breath++) {
         breath(selected_color, i_breath);
         ActMillis = millis();
-        if (ActMillis - RefMillis > answer_time_out) {
+        if (ActMillis - refTime > answer_time_out) {
           off();
           sprintf(msg, "L%d: Answer time out", lampVal);
           lamp->save(msg);
@@ -320,21 +320,21 @@ void loop() {
       display.startscrollleft(128, 0);
       display.display();  // Show initial text
       delay(100);
-      RefMillis = millis();
+      refTime = millis();
       sprintf(msg, "L%d: connected", lampVal);
       lamp->save(msg);
       lamp->save(0);
       state = 7;
       break;
 
-    case 7:  // Turned on
+    case 7:  // Turned on, pulse waiting
       ActMillis = millis();
       //  Send pulse
       if (digitalRead(GPIOPIN) == HIGH) {
-        lamp->save(420 + sendVal);
+        lamp->save(990 + sendVal);
         pulse(selected_color);
       }
-      if (ActMillis - RefMillis > on_time) {
+      if (ActMillis - refTime > on_time) {
         off();
         lamp->save(0);
         state = 8;
@@ -346,7 +346,7 @@ void loop() {
       state = 0;
       break;
 
-    case 9:  // Msg received
+    case 9:  // Mess received
       if (selected_color == 0) {
         display.clearDisplay();
         display.setCursor(0, 0);
@@ -380,11 +380,11 @@ void loop() {
       }
       sprintf(msg, "L%d: msg received", lampVal);
       lamp->save(msg);
-      RefMillis = millis();
+      refTime = millis();
       state = 10;
       break;
 
-    case 10:  // Send answer wait
+    case 10:  // Wait for touch before sending ans
       for (i_breath = 236; i_breath <= 549; i_breath++) {
         breath(selected_color, i_breath);
         if (digitalRead(GPIOPIN) == HIGH) {
@@ -392,7 +392,7 @@ void loop() {
           break;
         }
         ActMillis = millis();
-        if (ActMillis - RefMillis > answer_time_out) {
+        if (ActMillis - refTime > answer_time_out) {
           off();
           sprintf(msg, "L%d: answer time out", lampVal);
           lamp->save(msg);
@@ -409,7 +409,7 @@ void loop() {
       display.println("Vua tra loi "+mainChar+" ruii..");
       display.display();  // Show initial text
       delay(100);
-      RefMillis = millis();
+      refTime = millis();
       sprintf(msg, "L%d: answer sent", lampVal);
       lamp->save(msg);
       lamp->save(1);
@@ -426,27 +426,23 @@ void loop() {
 void handleMessage(AdafruitIO_Data *data) {
   //convert the recieved data to an INT
   int reading = data->toInt();
-  if (reading == 66) {  //reset lamp 1 with code 401
+  if (reading == 66) { 
     sprintf(msg, "L%d: rebooting", lampVal);
     lamp->save(msg);
     delay(2000);
     ESP.restart();
-  } else if (reading == 100) {
-    sprintf(msg, "L%d: ping", lampVal);
-    lamp->save(msg);
-    lamp->save(0);
-  } else if (reading == 420 + recVal) {
+  } else if (reading == 990 + recVal) {
     sprintf(msg, "L%d: pulse received", lampVal);
     lamp->save(msg);
     lamp->save(0);
     pulse(selected_color);
   } else if (reading != 0 && reading / 10 != lampVal) {
-    // Is it a color msg?
+    // check for color message encoding
     if (state == 0 && reading != 1) {
       state = 9;
       selected_color = reading - recVal;
     }
-    // Is it an answer?
+    // check for answer message 
     if (state == 5 && reading == 1)
       state = 6;
   }
@@ -469,6 +465,7 @@ void light_full_intensity(int ind) {
   lightStrip.Show();
 }
 
+//lighting animation
 void pulse(int ind) {
   int i;
   int i_step = 5;
@@ -491,7 +488,6 @@ void pulse(int ind) {
   }
 }
 
-// Inspired by Jason Yandell
 void breath(int ind, int i) {
   float MaximumBrightness = max_intensity / 2;
   float SpeedFactor = 0.02;
@@ -529,7 +525,7 @@ void flash(int ind) {
 
 
 
-//The code that creates the gradual color change animation in the Neopixels (thank you to Adafruit for this!!)
+//Gradual color change animation in the Neopixels 
 void spin(int ind) {
   lightStrip.SetBrightness(max_intensity);
   for (int i = 0; i < LEDS; i++) {
@@ -597,7 +593,7 @@ void wificonfig() {
     delay(50);
     off();
   } else {
-    //if you get here you have connected to the WiFi
+    // connected to the WiFi
     spin(3);
     delay(50);
     off();
